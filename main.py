@@ -1,24 +1,23 @@
+import sys
 import requests
 from bs4 import BeautifulSoup
+import sqlite3
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QPushButton, QListWidget, QLineEdit
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtCore import QUrl
 
 def google_search(query):
-    # ссылка для поиска
     url = f"https://www.google.com/search?q={query}"
-    
-    # важная хрень если requests будет выдавать ошибку поменять 
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) YandexBrowser/91.0.4472.124 Safari/537.36"
     }
     response = requests.get(url, headers=headers)
     
-    # проверка на ошибку
     if response.status_code != 200:
         print("Ошибка при выполнении запроса.")
         return []
     
     soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # берем ссылки из запроса который сделался из url
     results = []
     for g in soup.find_all('div', class_='g'):
         title = g.find('h3')
@@ -28,81 +27,106 @@ def google_search(query):
     
     return results
 
-def main():
-    query = input("Введите текст для поиска: ")
-    
-    # Получаем результаты поиска
-    results = google_search(query)
-    
-    if not results:
-        print("Результаты не найдены.")
-        return
-    
-    print("\nРезультаты поиска:")
-    for i, (title, link) in enumerate(results):
-        # выводим что он там нашел 
-        print(f"{i + 1}: {title} - {link}")
-    
-    # пользователь выбирает 
-    try:
-        choice = int(input("\nВыберите номер сайта для перехода: ")) - 1
-        
-        if 0 <= choice < len(results):
-            print(f"Вы выбрали: {results[choice][1]}")
-            return results[choice][1]
-        else:
-            print("Неверный выбор.")
-    except ValueError:
-        print("Пожалуйста, введите корректный номер.")
+def create_database():
+    conn = sqlite3.connect('search_history.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            query TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
-# часть Qt приложения 
+def save_query(query):
+    conn = sqlite3.connect('search_history.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO history (query) VALUES (?)', (query,))
+    conn.commit()
+    conn.close()
 
-import sys
-from PyQt5.QtCore import QUrl
-from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, QLineEdit, QVBoxLayout, QWidget
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+def get_search_history():
+    conn = sqlite3.connect('search_history.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT query FROM history ORDER BY id DESC')
+    history = cursor.fetchall()
+    conn.close()
+    return [item[0] for item in history]
+
+class BrowserWindow(QWebEngineView):
+    def __init__(self, url):
+        super(BrowserWindow, self).__init__()
+        self.setUrl(QUrl(url))
+        self.resize(1200, 800)
+        self.show()  # Убедитесь, что окно отображается
 
 class MainWindow(QMainWindow):
     def __init__(self):
-        super(MainWindow, self).__init__()
-        url_seaching = main()
-        self.browser = QWebEngineView()
-        self.browser.setUrl(QUrl(url_seaching))
+        super().__init__()
+        self.layout = QVBoxLayout()
+        
+        self.search_input = QLineEdit(self)
+        self.search_input.setPlaceholderText("Введите запрос для поиска")
+        self.layout.addWidget(self.search_input)
+        
+        self.search_button = QPushButton("Поиск", self)
+        self.search_button.clicked.connect(self.perform_search)
+        self.layout.addWidget(self.search_button)
+        
+        self.results_list = QListWidget(self)
+        self.results_list.itemClicked.connect(self.open_link)
+        self.layout.addWidget(self.results_list)
 
-        self.setCentralWidget(self.browser)
-        self.showMaximized()
+        self.history_list = QListWidget(self)
+        self.history_list.itemClicked.connect(self.perform_history_search)
+        self.layout.addWidget(self.history_list)
 
-        # это панель из кнопок Назад вперед и обновить страницу а еще для ввода url
-        self.toolbar = QToolBar()
-        self.addToolBar(self.toolbar)
+        container = QWidget()
+        container.setLayout(self.layout)
+        
+        self.setCentralWidget(container)
 
-        # Кнопка назад
-        back_btn = QAction('Назад', self)
-        back_btn.triggered.connect(self.browser.back)
-        self.toolbar.addAction(back_btn)
+        # загружаем историю поиска
+        self.load_search_history()
 
-        # Кнопка вперед
-        forward_btn = QAction('Вперед', self)
-        forward_btn.triggered.connect(self.browser.forward)
-        self.toolbar.addAction(forward_btn)
+    def perform_search(self):
+        query = self.search_input.text()
+        if query:
+            print(f"Ищем такую штуку: {query}")
+            results = google_search(query)
+            if results:
+                self.results_list.clear()
+                for title, link in results:
+                    self.results_list.addItem(f"{title} - {link}")
+                save_query(query) 
+                self.load_search_history() # обновляем историю поиска
+            else:
+                print("Ничего не найдено")
 
-        # Кнопка обновить
-        reload_btn = QAction('Обновить', self)
-        reload_btn.triggered.connect(self.browser.reload)
-        self.toolbar.addAction(reload_btn)
+    def load_search_history(self):
+        history = get_search_history()
+        self.history_list.clear()
+        for query in history:
+            self.history_list.addItem(query)
 
-    def navigate_to_url(self):
-        url = self.url_bar.text()
-        if not url.startswith('http'):
-            url = 'http://' + url
-        self.browser.setUrl(QUrl(url))
+    def open_link(self, item):
+        link = item.text().split(' - ')[1]
+        if link.startswith("http"):  # проверяем, что с ссылкой все норм
+            print(f"Открываем вот это: {link}")
+            self.new_window = BrowserWindow(link)
+            self.new_window.show() 
+        else:
+            print("ссылка не рабочая")
 
-    def update_url(self, q):
-        self.url_bar.setText(q.toString())
+    def perform_history_search(self, item):
+        query = item.text()
+        self.search_input.setText(query) # текс -> в поле ввода
+        self.perform_search()  # Ищем текст по полю ввода
 
-if __name__ == "__main__":
+if __name__ == '__main__':
+    create_database()  # создание бд при запуске
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.setWindowTitle('...')
     window.show()
     sys.exit(app.exec_())
