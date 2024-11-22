@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from PyQt5.QtCore import QProcess, QUrl
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QPushButton, QListWidget, QLineEdit, \
-    QMessageBox, QTextEdit, QPushButton
+    QMessageBox, QTextEdit, QPushButton, QFileDialog
 
 
 def google_search(query):
@@ -180,10 +180,6 @@ class Browser(QMainWindow):
         self.terminal_windown = MainWindow()
         self.terminal_windown.show()
         self.hide()
-
-
-from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QWidget, QPushButton, QTextEdit, QFileDialog, QMessageBox
-from PyQt5 import QtGui
 
 
 class Redaktor_texta(QMainWindow):
