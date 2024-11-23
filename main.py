@@ -525,7 +525,7 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == '__main__':
-    # create_database()  # создание бд при запуске
+    create_database()  # создание бд при запуске
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
