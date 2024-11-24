@@ -64,7 +64,7 @@ def get_search_history():  # история поиска
 class BrowserWindow(QWebEngineView):  # окно с ссылкой
     def __init__(self, url):
         super(BrowserWindow, self).__init__()
-        self.setUrl(QUrl(url))
+        self.setUrl(QUrl(url)) # открываем окно с ссылкой из класса Browser
         self.resize(1200, 800)
         self.show()
 
