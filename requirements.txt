@@ -1,4 +1,4 @@
-PyQt5
-PyQtWebEngine
-requests
-beautifulsoup4
+PyQt5==5.15.10
+PyQtWebEngine==6.7.0
+requests==2.32.2
+beautifulsoup4==4.12.3
